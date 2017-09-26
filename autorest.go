@@ -3,8 +3,6 @@ package autorest
 import (
 	"database/sql"
 	"encoding/json"
-	// "fmt"
-	// "os"
 	_ "github.com/go-sql-driver/mysql"
 	"net/http"
 	"strconv"
@@ -19,11 +17,6 @@ type DatabaseCredentials struct {
 }
 
 func (s *Server) connectToDB(credentials DatabaseCredentials) {
-	/*user := os.Getenv("DB_USER")
-	pass := os.Getenv("DB_PASS")
-	name := os.Getenv("DB_NAME")
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")*/
 	dsn := credentials.Username + ":" + credentials.Password + "@tcp(" + credentials.Host + ":" + credentials.Port + ")/" + credentials.Name
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
@@ -33,12 +26,14 @@ func (s *Server) connectToDB(credentials DatabaseCredentials) {
 }
 
 type Server struct {
-	db *sql.DB
+	db      *sql.DB
+	handler *AutorestHandler
 }
 
 func NewServer(credentials DatabaseCredentials) *Server {
 	s := &Server{}
 	s.connectToDB(credentials)
+	s.handler = NewMysqlHandler(s.db)
 	return s
 }
 
@@ -51,7 +46,14 @@ func (s *Server) Run(port string) {
 			w.Write([]byte("{\"error\":" + err.Error() + "}"))
 			return
 		}
-		response, err := json.Marshal(request)
+		result, err := s.handler.handleRequest(request)
+		if err != nil {
+			statusCode, _ := strconv.Atoi(err.Error())
+			w.WriteHeader(statusCode)
+			w.Write([]byte("{\"error\":" + err.Error() + "}"))
+			return
+		}
+		response, err := json.Marshal(result)
 		if err != nil {
 			w.WriteHeader(500)
 			w.Write([]byte("{\"error\":500}"))
