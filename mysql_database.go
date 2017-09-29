@@ -1,7 +1,6 @@
 package autorest
 
 import (
-	"fmt"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
 	"reflect"
@@ -99,20 +98,29 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
 	defer stmt.Close()
 	defer rows.Close()
 	result := make(map[string]interface{})
 	if rows.Next() {
-		row := make([]interface{}, len(table.Columns))
-		if err = rows.Scan(row...); err != nil {
+		row := make([]interface{}, len(columns))
+		rowPointers := make([]interface{}, len(columns))
+		for i := 0; i < len(table.Columns); i++ {
+			rowPointers[i] = &row[i]
+		}
+		if err = rows.Scan(rowPointers...); err != nil {
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
-		for i, value := range row {
-			switch table.Columns[i].Type {
-			case reflect.String:
-				result[table.Columns[i].Name] = value.(string)
-			case reflect.Int64:
-				result[table.Columns[i].Name] = value.(int64)
+		for i, _ := range columns {
+			var rawValue = *(rowPointers[i].(*interface{}))
+			switch rawValue.(type) {
+			case []byte:
+				result[table.Columns[i].Name] = string(rawValue.([]byte))
+			case int,int32,int8,uint,uint32,uint8,int64:
+				result[table.Columns[i].Name] = rawValue.(int64)
 			default:
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
