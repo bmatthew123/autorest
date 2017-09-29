@@ -2,7 +2,6 @@ package autorest
 
 import (
 	_ "github.com/go-sql-driver/mysql"
-	"reflect"
 )
 
 type SqlDatabase interface {
@@ -18,11 +17,11 @@ type SqlDatabase interface {
 
 type Table struct {
 	Name     string
-	Columns  []*Column
+	// Columns  []*Column
 	PKColumn string
 }
 
-type Column struct {
+/* type Column struct {
 	Name string
 	Type reflect.Kind
-}
+}*/

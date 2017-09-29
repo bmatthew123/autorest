@@ -3,8 +3,6 @@ package autorest
 import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
-	"reflect"
-	"strings"
 )
 
 type MysqlDatabase struct {
@@ -32,13 +30,13 @@ func (mysql *MysqlDatabase) ParseSchema() {
 	for rows.Next() {
 		var tableName string
 		rows.Scan(&tableName)
-		cols, pkColumn := mysql.parseColumns(tableName)
-		mysql.tables[tableName] = &Table{Name: tableName, Columns: cols, PKColumn: pkColumn}
+		pkColumn := mysql.getPKColumn(tableName)
+		mysql.tables[tableName] = &Table{Name: tableName, PKColumn: pkColumn}
 	}
 }
 
-func (mysql *MysqlDatabase) parseColumns(tableName string) (cols []*Column, pkCol string) {
-	stmt, err := mysql.db.Prepare("SELECT column_name, data_type, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
+func (mysql *MysqlDatabase) getPKColumn(tableName string) (pkCol string) {
+	stmt, err := mysql.db.Prepare("SELECT column_name, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
 	if err != nil {
 		panic(err)
 	}
@@ -48,14 +46,10 @@ func (mysql *MysqlDatabase) parseColumns(tableName string) (cols []*Column, pkCo
 	}
 	defer stmt.Close()
 	defer rows.Close()
-	cols = make([]*Column, 0)
 	for rows.Next() {
 		var colName string
-		var colType string
 		var colKey string
-		rows.Scan(&colName, &colType, &colKey)
-		col := Column{Name: colName, Type: getGoTypeFromSQLType(colType)}
-		cols = append(cols, &col)
+		rows.Scan(&colName, &colKey)
 		if colKey == "PRI" {
 			pkCol = colName
 		}
@@ -76,24 +70,12 @@ func (mysql *MysqlDatabase) GetTable(tableName string) *Table {
 	}
 }
 
-func getGoTypeFromSQLType(sqlType string) reflect.Kind {
-	switch sqlType {
-	case "varchar":
-		return reflect.String
-	case "int":
-		return reflect.Int64
-	default:
-		panic("No idea what to do with a column of type " + sqlType)
-	}
-}
-
 func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	table := mysql.GetTable(r.Table)
 	stmt, err := mysql.db.Prepare(buildSelectQuery(table))
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
-
 	rows, err := stmt.Query(r.Id)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
@@ -108,19 +90,19 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	if rows.Next() {
 		row := make([]interface{}, len(columns))
 		rowPointers := make([]interface{}, len(columns))
-		for i := 0; i < len(table.Columns); i++ {
+		for i := 0; i < len(columns); i++ {
 			rowPointers[i] = &row[i]
 		}
 		if err = rows.Scan(rowPointers...); err != nil {
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
-		for i, _ := range columns {
+		for i, column := range columns {
 			var rawValue = *(rowPointers[i].(*interface{}))
 			switch rawValue.(type) {
 			case []byte:
-				result[table.Columns[i].Name] = string(rawValue.([]byte))
+				result[column] = string(rawValue.([]byte))
 			case int,int32,int8,uint,uint32,uint8,int64:
-				result[table.Columns[i].Name] = rawValue.(int64)
+				result[column] = rawValue.(int64)
 			default:
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
@@ -130,11 +112,7 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 }
 
 func buildSelectQuery(table *Table) string {
-	cols := make([]string, len(table.Columns))
-	for i := 0; i < len(table.Columns); i++ {
-		cols[i] = table.Columns[i].Name
-	}
-	return "SELECT " + strings.Join(cols, ",") + " FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
+	return "SELECT * FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
 }
 
 func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
