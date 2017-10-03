@@ -142,7 +142,46 @@ func buildSelectQuery(table *Table) string {
 }
 
 func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
-	return nil, nil
+	table := mysql.GetTable(r.Table)
+	stmt, err := mysql.db.Prepare("SELECT * FROM " + table.Name)
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	columns, err := rows.Columns()
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	defer stmt.Close()
+	defer rows.Close()
+	result := make([]map[string]interface{}, 0)
+	for rows.Next() {
+		item := make(map[string]interface{})
+		row := make([]interface{}, len(columns))
+		rowPointers := make([]interface{}, len(columns))
+		for i := 0; i < len(columns); i++ {
+			rowPointers[i] = &row[i]
+		}
+		if err = rows.Scan(rowPointers...); err != nil {
+			return nil, ApiError{INTERNAL_SERVER_ERROR}
+		}
+		for i, column := range columns {
+			var rawValue = *(rowPointers[i].(*interface{}))
+			switch rawValue.(type) {
+			case []byte:
+				item[column] = string(rawValue.([]byte))
+			case int,int32,int8,uint,uint32,uint8,int64:
+				item[column] = rawValue.(int64)
+			default:
+				return nil, ApiError{INTERNAL_SERVER_ERROR}
+			}
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
