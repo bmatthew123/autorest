@@ -30,9 +30,35 @@ func (mysql *MysqlDatabase) ParseSchema() {
 	for rows.Next() {
 		var tableName string
 		rows.Scan(&tableName)
-		pkColumn := mysql.getPKColumn(tableName)
-		mysql.tables[tableName] = &Table{Name: tableName, PKColumn: pkColumn}
+		cols, pkColumn := mysql.parseColumns(tableName)
+		mysql.tables[tableName] = &Table{Name: tableName, Columns: cols, PKColumn: pkColumn}
 	}
+}
+
+func (mysql *MysqlDatabase) parseColumns(tableName string) (cols []*Column, pkCol string) {
+	stmt, err := mysql.db.Prepare("SELECT column_name, data_type, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
+	if err != nil {
+		panic(err)
+	}
+	rows, err := stmt.Query()
+	if err != nil {
+		panic(err)
+	}
+	defer stmt.Close()
+	defer rows.Close()
+	cols = make([]*Column, 0)
+	for rows.Next() {
+		var colName string
+		var colType string
+		var colKey string
+		rows.Scan(&colName, &colType, &colKey)
+		col := Column{Name: colName}
+		cols = append(cols, &col)
+		if colKey == "PRI" {
+			pkCol = colName
+		}
+	}
+	return
 }
 
 func (mysql *MysqlDatabase) getPKColumn(tableName string) (pkCol string) {

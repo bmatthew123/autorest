@@ -17,11 +17,11 @@ type SqlDatabase interface {
 
 type Table struct {
 	Name     string
-	// Columns  []*Column
+	Columns  []*Column
 	PKColumn string
 }
 
-/* type Column struct {
+type Column struct {
 	Name string
-	Type reflect.Kind
-}*/
+	// Type reflect.Kind
+}
