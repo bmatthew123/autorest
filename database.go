@@ -12,7 +12,7 @@ type SqlDatabase interface {
 	GetAll(r request) (interface{}, error)
 	Post(r request) (interface{}, error)
 	Put(r request) (interface{}, error)
-	Delete(r request) (interface{}, error)
+	Delete(r request) error
 }
 
 type Table struct {

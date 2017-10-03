@@ -34,7 +34,7 @@ func (h *AutorestHandler) handleRequest(r request) (interface{}, error) {
 	case PUT:
 		return h.db.Put(r)
 	case DELETE:
-		return h.db.Delete(r)
+		return nil, h.db.Delete(r)
 	default:
 		return nil, ApiError{METHOD_NOT_SUPPORTED}
 	}

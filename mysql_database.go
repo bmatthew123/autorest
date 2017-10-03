@@ -192,6 +192,20 @@ func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
 	return nil, nil
 }
 
-func (mysql *MysqlDatabase) Delete(r request) (interface{}, error) {
-	return nil, nil
+func (mysql *MysqlDatabase) Delete(r request) error {
+	table := mysql.GetTable(r.Table)
+	stmt, err := mysql.db.Prepare(buildDeleteQuery(table))
+	if err != nil {
+		return ApiError{INTERNAL_SERVER_ERROR}
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(r.Id)
+	if err != nil {
+		return ApiError{INTERNAL_SERVER_ERROR}
+	}
+	return nil
+}
+
+func buildDeleteQuery(table *Table) string {
+	return "DELETE FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
 }
