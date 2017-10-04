@@ -133,6 +133,8 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
 		}
+	} else {
+		return nil, ApiError{NOT_FOUND}
 	}
 	return result, nil
 }

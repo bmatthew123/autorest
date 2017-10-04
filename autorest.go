@@ -8,6 +8,13 @@ import (
 	"strconv"
 )
 
+const (
+	BAD_REQUEST           = 400
+	NOT_FOUND             = 404
+	METHOD_NOT_SUPPORTED  = 405
+	INTERNAL_SERVER_ERROR = 500
+)
+
 type DatabaseCredentials struct {
 	Name     string
 	Username string
