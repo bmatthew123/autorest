@@ -25,3 +25,12 @@ type Column struct {
 	Name string
 	// Type reflect.Kind
 }
+
+func (t *Table) HasColumn(colName string) bool {
+	for _, col := range t.Columns {
+		if col.Name == colName {
+			return true
+		}
+	}
+	return false
+}

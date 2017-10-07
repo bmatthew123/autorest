@@ -1,6 +1,8 @@
 package autorest
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,9 +17,10 @@ const (
 )
 
 type request struct {
-	Table  string `json:"table"`
-	Action int    `json:"action"`
-	Id     int    `json:"id"`
+	Table  string
+	Action int
+	Id     int
+	Data   map[string]interface{}
 	hasId  bool
 }
 
@@ -34,7 +37,14 @@ func parseRequest(r *http.Request) (request, error) {
 	if err != nil {
 		return request{}, err
 	}
-	return request{Id: id, Table: parts[1], Action: method, hasId: hasId}, nil
+	var data map[string]interface{}
+	if method == POST || method == PUT {
+		data, err = parseDataFromRequest(r)
+		if err != nil {
+			return request{}, err
+		}
+	}
+	return request{Id: id, Table: parts[1], Action: method, Data: data, hasId: hasId}, nil
 }
 
 func getMethod(r *http.Request) (int, error) {
@@ -76,4 +86,16 @@ func parseIdFromRequest(r *http.Request) (int, error, bool) {
 		return 0, ApiError{BAD_REQUEST}, false
 	}
 	return id, nil, true
+}
+
+func parseDataFromRequest(r *http.Request) (map[string]interface{}, error) {
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	var data map[string]interface{}
+	err := decoder.Decode(&data)
+	if err != nil {
+		fmt.Println(err)
+		return nil, ApiError{BAD_REQUEST}
+	}
+	return data, nil
 }

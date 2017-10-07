@@ -3,6 +3,7 @@ package autorest
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	_ "github.com/go-sql-driver/mysql"
 	"net/http"
 	"strconv"
@@ -46,6 +47,7 @@ func NewServer(credentials DatabaseCredentials) *Server {
 
 func (s *Server) Run(port string) {
 	http.HandleFunc("/rest/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		request, err := parseRequest(r)
 		if err != nil {
 			statusCode, _ := strconv.Atoi(err.Error())
@@ -77,4 +79,21 @@ type ApiError struct {
 
 func (e ApiError) Error() string {
 	return strconv.Itoa(e.HTTPStatusCode)
+}
+
+
+
+func DetermineTypeForRawValue(value interface{}) (interface{}, error) {
+	var rawValue = *(value.(*interface{}))
+	switch rawValue.(type) {
+	case []byte:
+		return string(rawValue.([]byte)), nil
+	case int, int32, int8, uint, uint32, uint8, int64:
+		return rawValue.(int64), nil
+	default:
+		if rawValue != nil {
+			return nil, errors.New("Unable to determine a data type for this rawValue")
+		}
+		return nil, nil
+	}
 }

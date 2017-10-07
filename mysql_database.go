@@ -123,15 +123,11 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
 		for i, column := range columns {
-			var rawValue = *(rowPointers[i].(*interface{}))
-			switch rawValue.(type) {
-			case []byte:
-				result[column] = string(rawValue.([]byte))
-			case int,int32,int8,uint,uint32,uint8,int64:
-				result[column] = rawValue.(int64)
-			default:
+			value, err := DetermineTypeForRawValue(rowPointers[i])
+			if err != nil {
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
+			result[column] = value
 		}
 	} else {
 		return nil, ApiError{NOT_FOUND}
@@ -171,15 +167,11 @@ func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
 		for i, column := range columns {
-			var rawValue = *(rowPointers[i].(*interface{}))
-			switch rawValue.(type) {
-			case []byte:
-				item[column] = string(rawValue.([]byte))
-			case int,int32,int8,uint,uint32,uint8,int64:
-				item[column] = rawValue.(int64)
-			default:
+			value, err := DetermineTypeForRawValue(rowPointers[i])
+			if err != nil {
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
+			item[column] = value
 		}
 		result = append(result, item)
 	}
@@ -187,7 +179,39 @@ func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
 }
 
 func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
+	table := mysql.GetTable(r.Table)
+	query, values := buildPOSTQueryAndValues(r, table)
+	stmt, err := mysql.db.Prepare(query)
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	_, err = stmt.Exec(values...)
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	defer stmt.Close()
 	return nil, nil
+}
+
+func buildPOSTQueryAndValues(r request, t *Table) (query string, values []interface{}) {
+	query = "INSERT INTO " + t.Name + " ("
+	values = make([]interface{}, 0)
+	valuesClause := ""
+	i := 0
+	for key, value := range r.Data {
+		if t.HasColumn(key) {
+			if i > 0 {
+				query += ","
+				valuesClause += ","
+			}
+			query += key
+			valuesClause += "?"
+			values = append(values, value)
+			i++
+		}
+	}
+	query += ") VALUES (" + valuesClause + ")"
+	return
 }
 
 func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
