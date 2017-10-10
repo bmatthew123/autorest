@@ -19,7 +19,7 @@ const (
 type request struct {
 	Table  string
 	Action int
-	Id     int
+	Id     int64
 	Data   map[string]interface{}
 	hasId  bool
 }
@@ -76,12 +76,12 @@ func getMethod(r *http.Request) (int, error) {
 	}
 }
 
-func parseIdFromRequest(r *http.Request) (int, error, bool) {
+func parseIdFromRequest(r *http.Request) (int64, error, bool) {
 	parts := strings.Split(r.URL.Path, "/")[1:]
 	if len(parts) < 3 {
 		return 0, nil, false
 	}
-	id, err := strconv.Atoi(parts[2])
+	id, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil {
 		return 0, ApiError{BAD_REQUEST}, false
 	}

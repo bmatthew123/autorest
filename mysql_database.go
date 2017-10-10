@@ -185,12 +185,27 @@ func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
-	_, err = stmt.Exec(values...)
+	result, err := stmt.Exec(values...)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
-	return nil, nil
+	return mysql.getInsertedItem(r, result)
+}
+
+func (mysql *MysqlDatabase) getInsertedItem(r request, result sql.Result) (interface{}, error) {
+	if newId, err := result.LastInsertId(); err == nil {
+		r.Id = newId
+		return mysql.Get(r)
+	}
+	pkColumn := mysql.GetTable(r.Table).PKColumn
+	for key, value := range r.Data {
+		if key == pkColumn {
+			r.Id = value.(int64)
+			return mysql.Get(r)
+		}
+	}
+	return r.Data, nil
 }
 
 func buildPOSTQueryAndValues(r request, t *Table) (query string, values []interface{}) {
@@ -215,7 +230,37 @@ func buildPOSTQueryAndValues(r request, t *Table) (query string, values []interf
 }
 
 func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
-	return nil, nil
+	table := mysql.GetTable(r.Table)
+	query, values := buildPUTQueryAndValues(r, table)
+	stmt, err := mysql.db.Prepare(query)
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec(values...)
+	if err != nil {
+		return nil, ApiError{INTERNAL_SERVER_ERROR}
+	}
+	return mysql.Get(r)
+}
+
+func buildPUTQueryAndValues(r request, t *Table) (string, []interface{}) {
+	query := "UPDATE " + t.Name + " SET "
+	values := make([]interface{}, 0)
+	i := 0
+	for key, value := range r.Data {
+		if t.HasColumn(key) {
+			if i > 0 {
+				query += ","
+			}
+			query += key + "=?"
+			values = append(values, value)
+			i++
+		}
+	}
+	query += " WHERE " + t.PKColumn + "=?"
+	values = append(values, r.Id)
+	return query, values
 }
 
 func (mysql *MysqlDatabase) Delete(r request) error {
