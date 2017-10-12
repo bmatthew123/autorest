@@ -2,6 +2,7 @@ package autorest
 
 import (
 	_ "github.com/go-sql-driver/mysql"
+	"database/sql"
 )
 
 type SqlDatabase interface {
@@ -23,7 +24,6 @@ type Table struct {
 
 type Column struct {
 	Name string
-	// Type reflect.Kind
 }
 
 func (t *Table) HasColumn(colName string) bool {
@@ -33,4 +33,21 @@ func (t *Table) HasColumn(colName string) bool {
 		}
 	}
 	return false
+}
+
+type DatabaseCredentials struct {
+	Name     string
+	Username string
+	Password string
+	Host     string
+	Port     string
+}
+
+func (s *Server) connectToDB(credentials DatabaseCredentials) {
+	dsn := credentials.Username + ":" + credentials.Password + "@tcp(" + credentials.Host + ":" + credentials.Port + ")/" + credentials.Name
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		panic(err)
+	}
+	s.db = db
 }
