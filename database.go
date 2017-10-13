@@ -2,10 +2,14 @@ package autorest
 
 import (
 	_ "github.com/go-sql-driver/mysql"
-	"database/sql"
+)
+
+const (
+	MYSQL = "mysql"
 )
 
 type SqlDatabase interface {
+	ConnectToDB(credentials DatabaseCredentials)
 	ParseSchema()
 	HasTable(tableName string) bool
 	GetTable(tableName string) *Table
@@ -41,13 +45,5 @@ type DatabaseCredentials struct {
 	Password string
 	Host     string
 	Port     string
-}
-
-func (s *Server) connectToDB(credentials DatabaseCredentials) {
-	dsn := credentials.Username + ":" + credentials.Password + "@tcp(" + credentials.Host + ":" + credentials.Port + ")/" + credentials.Name
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		panic(err)
-	}
-	s.db = db
+	Type	 string
 }

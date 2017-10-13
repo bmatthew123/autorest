@@ -10,10 +10,20 @@ type MysqlDatabase struct {
 	tables map[string]*Table
 }
 
-func NewMysqlDatabase(db *sql.DB) SqlDatabase {
-	mysql := &MysqlDatabase{db: db, tables: make(map[string]*Table)}
+func NewMysqlDatabase(credentials DatabaseCredentials) SqlDatabase {
+	mysql := &MysqlDatabase{tables: make(map[string]*Table)}
+	mysql.ConnectToDB(credentials)
 	mysql.ParseSchema()
 	return mysql
+}
+
+func (mysql *MysqlDatabase) ConnectToDB(credentials DatabaseCredentials) {
+	dsn := credentials.Username + ":" + credentials.Password + "@tcp(" + credentials.Host + ":" + credentials.Port + ")/" + credentials.Name
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		panic(err)
+	}
+	mysql.db = db
 }
 
 func (mysql *MysqlDatabase) ParseSchema() {
