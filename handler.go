@@ -5,46 +5,74 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type MysqlDatabase struct {
-	db     *sql.DB
-	tables DatabaseSchema
+type Handler struct {
+	db           *sql.DB
+	tables       DatabaseSchema
+	queryBuilder QueryBuilder
 }
 
-func NewMysqlDatabase(credentials DatabaseCredentials) SqlDatabase {
-	mysql := &MysqlDatabase{tables: make(map[string]*Table)}
-	mysql.ConnectToDB(credentials)
-	mysql.tables = (&MysqlQueryBuilder{}).ParseSchema(mysql.db)
-	return mysql
+func NewHandler(credentials DatabaseCredentials) *Handler {
+	handler := &Handler{tables: make(map[string]*Table)}
+	handler.getQueryBuilder(credentials)
+	handler.ConnectToDB(credentials)
+	handler.tables = handler.queryBuilder.ParseSchema(handler.db)
+	return handler
 }
 
-func (mysql *MysqlDatabase) ConnectToDB(credentials DatabaseCredentials) {
-	dsn := MysqlQueryBuilder{}.CreateDSN(credentials)
+func (handler *Handler) getQueryBuilder(credentials DatabaseCredentials) {
+	switch credentials.Type {
+	case MYSQL:
+		handler.queryBuilder = &MysqlQueryBuilder{}
+	default:
+		panic("Unknown database type. Supported type is only 'mysql' right now")
+	}
+}
+
+func (handler *Handler) ConnectToDB(credentials DatabaseCredentials) {
+	dsn := handler.queryBuilder.CreateDSN(credentials)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
 	}
-	mysql.db = db
+	handler.db = db
 }
 
-func (mysql *MysqlDatabase) ParseSchema() {
+func (h *Handler) HandleRequest(r request) (interface{}, error) {
+	if !h.HasTable(r.Table) {
+		return nil, ApiError{NOT_FOUND}
+	}
+	switch r.Action {
+	case GET:
+		return h.Get(r)
+	case GET_ALL:
+		return h.GetAll(r)
+	case POST:
+		return h.Post(r)
+	case PUT:
+		return h.Put(r)
+	case DELETE:
+		return "", h.Delete(r)
+	default:
+		return nil, ApiError{METHOD_NOT_SUPPORTED}
+	}
 }
 
-func (mysql *MysqlDatabase) HasTable(tableName string) bool {
-	_, ok := mysql.tables[tableName]
+func (handler *Handler) HasTable(tableName string) bool {
+	_, ok := handler.tables[tableName]
 	return ok
 }
 
-func (mysql *MysqlDatabase) GetTable(tableName string) *Table {
-	if table, ok := mysql.tables[tableName]; ok {
+func (handler *Handler) GetTable(tableName string) *Table {
+	if table, ok := handler.tables[tableName]; ok {
 		return table
 	} else {
 		return nil
 	}
 }
 
-func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
-	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildSelectQuery(table))
+func (handler *Handler) Get(r request) (interface{}, error) {
+	table := handler.GetTable(r.Table)
+	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildSelectQuery(table))
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -81,9 +109,9 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	return result, nil
 }
 
-func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
-	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildSelectAllQuery(table))
+func (handler *Handler) GetAll(r request) (interface{}, error) {
+	table := handler.GetTable(r.Table)
+	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildSelectAllQuery(table))
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -120,10 +148,10 @@ func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
 	return result, nil
 }
 
-func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
-	table := mysql.GetTable(r.Table)
-	query, values := MysqlQueryBuilder{}.BuildPOSTQueryAndValues(r, table)
-	stmt, err := mysql.db.Prepare(query)
+func (handler *Handler) Post(r request) (interface{}, error) {
+	table := handler.GetTable(r.Table)
+	query, values := handler.queryBuilder.BuildPOSTQueryAndValues(r, table)
+	stmt, err := handler.db.Prepare(query)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -132,28 +160,28 @@ func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
-	return mysql.getInsertedItem(r, result)
+	return handler.getInsertedItem(r, result)
 }
 
-func (mysql *MysqlDatabase) getInsertedItem(r request, result sql.Result) (interface{}, error) {
+func (handler *Handler) getInsertedItem(r request, result sql.Result) (interface{}, error) {
 	if newId, err := result.LastInsertId(); err == nil {
 		r.Id = newId
-		return mysql.Get(r)
+		return handler.Get(r)
 	}
-	pkColumn := mysql.GetTable(r.Table).PKColumn
+	pkColumn := handler.GetTable(r.Table).PKColumn
 	for key, value := range r.Data {
 		if key == pkColumn {
 			r.Id = value.(int64)
-			return mysql.Get(r)
+			return handler.Get(r)
 		}
 	}
 	return r.Data, nil
 }
 
-func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
-	table := mysql.GetTable(r.Table)
-	query, values := MysqlQueryBuilder{}.BuildPUTQueryAndValues(r, table)
-	stmt, err := mysql.db.Prepare(query)
+func (handler *Handler) Put(r request) (interface{}, error) {
+	table := handler.GetTable(r.Table)
+	query, values := handler.queryBuilder.BuildPUTQueryAndValues(r, table)
+	stmt, err := handler.db.Prepare(query)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -162,12 +190,12 @@ func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
-	return mysql.Get(r)
+	return handler.Get(r)
 }
 
-func (mysql *MysqlDatabase) Delete(r request) error {
-	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildDeleteQuery(table))
+func (handler *Handler) Delete(r request) error {
+	table := handler.GetTable(r.Table)
+	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildDeleteQuery(table))
 	if err != nil {
 		return ApiError{INTERNAL_SERVER_ERROR}
 	}

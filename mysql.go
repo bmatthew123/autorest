@@ -6,13 +6,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type QueryBuilder interface {
-	CreateDSN(credentials DatabaseCredentials) string
-	ParseSchema(db *sql.DB) DatabaseSchema
-}
-
-type DatabaseSchema map[string]*Table
-
 type MysqlQueryBuilder struct{}
 
 func (MysqlQueryBuilder) CreateDSN(credentials DatabaseCredentials) string {
@@ -25,7 +18,7 @@ func (MysqlQueryBuilder) CreateDSN(credentials DatabaseCredentials) string {
 	)
 }
 
-func (mysql *MysqlQueryBuilder) ParseSchema(db *sql.DB) DatabaseSchema {
+func (MysqlQueryBuilder) ParseSchema(db *sql.DB) DatabaseSchema {
 	schema := make(DatabaseSchema)
 	stmt, err := db.Prepare("SHOW TABLES")
 	if err != nil {
@@ -40,13 +33,13 @@ func (mysql *MysqlQueryBuilder) ParseSchema(db *sql.DB) DatabaseSchema {
 	for rows.Next() {
 		var tableName string
 		rows.Scan(&tableName)
-		cols, pkColumn := mysql.parseColumns(db, tableName)
+		cols, pkColumn := MysqlQueryBuilder{}.parseColumns(db, tableName)
 		schema[tableName] = &Table{Name: tableName, Columns: cols, PKColumn: pkColumn}
 	}
 	return schema
 }
 
-func (mysql *MysqlQueryBuilder) parseColumns(db *sql.DB, tableName string) (cols []*Column, pkCol string) {
+func (MysqlQueryBuilder) parseColumns(db *sql.DB, tableName string) (cols []*Column, pkCol string) {
 	stmt, err := db.Prepare("SELECT column_name, data_type, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
 	if err != nil {
 		panic(err)
