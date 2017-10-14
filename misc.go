@@ -1,8 +1,8 @@
 package autorest
 
 import (
-	"strconv"
 	"errors"
+	"strconv"
 )
 
 const (

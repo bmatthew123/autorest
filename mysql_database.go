@@ -7,18 +7,18 @@ import (
 
 type MysqlDatabase struct {
 	db     *sql.DB
-	tables map[string]*Table
+	tables DatabaseSchema
 }
 
 func NewMysqlDatabase(credentials DatabaseCredentials) SqlDatabase {
 	mysql := &MysqlDatabase{tables: make(map[string]*Table)}
 	mysql.ConnectToDB(credentials)
-	mysql.ParseSchema()
+	mysql.tables = (&MysqlQueryBuilder{}).ParseSchema(mysql.db)
 	return mysql
 }
 
 func (mysql *MysqlDatabase) ConnectToDB(credentials DatabaseCredentials) {
-	dsn := credentials.Username + ":" + credentials.Password + "@tcp(" + credentials.Host + ":" + credentials.Port + ")/" + credentials.Name
+	dsn := MysqlQueryBuilder{}.CreateDSN(credentials)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
@@ -27,70 +27,6 @@ func (mysql *MysqlDatabase) ConnectToDB(credentials DatabaseCredentials) {
 }
 
 func (mysql *MysqlDatabase) ParseSchema() {
-	stmt, err := mysql.db.Prepare("SHOW TABLES")
-	if err != nil {
-		panic(err)
-	}
-	rows, err := stmt.Query()
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	defer rows.Close()
-	for rows.Next() {
-		var tableName string
-		rows.Scan(&tableName)
-		cols, pkColumn := mysql.parseColumns(tableName)
-		mysql.tables[tableName] = &Table{Name: tableName, Columns: cols, PKColumn: pkColumn}
-	}
-}
-
-func (mysql *MysqlDatabase) parseColumns(tableName string) (cols []*Column, pkCol string) {
-	stmt, err := mysql.db.Prepare("SELECT column_name, data_type, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
-	if err != nil {
-		panic(err)
-	}
-	rows, err := stmt.Query()
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	defer rows.Close()
-	cols = make([]*Column, 0)
-	for rows.Next() {
-		var colName string
-		var colType string
-		var colKey string
-		rows.Scan(&colName, &colType, &colKey)
-		col := Column{Name: colName}
-		cols = append(cols, &col)
-		if colKey == "PRI" {
-			pkCol = colName
-		}
-	}
-	return
-}
-
-func (mysql *MysqlDatabase) getPKColumn(tableName string) (pkCol string) {
-	stmt, err := mysql.db.Prepare("SELECT column_name, column_key FROM information_schema.columns WHERE table_name='" + tableName + "'")
-	if err != nil {
-		panic(err)
-	}
-	rows, err := stmt.Query()
-	if err != nil {
-		panic(err)
-	}
-	defer stmt.Close()
-	defer rows.Close()
-	for rows.Next() {
-		var colName string
-		var colKey string
-		rows.Scan(&colName, &colKey)
-		if colKey == "PRI" {
-			pkCol = colName
-		}
-	}
-	return
 }
 
 func (mysql *MysqlDatabase) HasTable(tableName string) bool {
@@ -108,7 +44,7 @@ func (mysql *MysqlDatabase) GetTable(tableName string) *Table {
 
 func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare(buildSelectQuery(table))
+	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildSelectQuery(table))
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -145,13 +81,9 @@ func (mysql *MysqlDatabase) Get(r request) (interface{}, error) {
 	return result, nil
 }
 
-func buildSelectQuery(table *Table) string {
-	return "SELECT * FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
-}
-
 func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
 	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare("SELECT * FROM " + table.Name)
+	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildSelectAllQuery(table))
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -190,7 +122,7 @@ func (mysql *MysqlDatabase) GetAll(r request) (interface{}, error) {
 
 func (mysql *MysqlDatabase) Post(r request) (interface{}, error) {
 	table := mysql.GetTable(r.Table)
-	query, values := buildPOSTQueryAndValues(r, table)
+	query, values := MysqlQueryBuilder{}.BuildPOSTQueryAndValues(r, table)
 	stmt, err := mysql.db.Prepare(query)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
@@ -218,30 +150,9 @@ func (mysql *MysqlDatabase) getInsertedItem(r request, result sql.Result) (inter
 	return r.Data, nil
 }
 
-func buildPOSTQueryAndValues(r request, t *Table) (query string, values []interface{}) {
-	query = "INSERT INTO " + t.Name + " ("
-	values = make([]interface{}, 0)
-	valuesClause := ""
-	i := 0
-	for key, value := range r.Data {
-		if t.HasColumn(key) {
-			if i > 0 {
-				query += ","
-				valuesClause += ","
-			}
-			query += key
-			valuesClause += "?"
-			values = append(values, value)
-			i++
-		}
-	}
-	query += ") VALUES (" + valuesClause + ")"
-	return
-}
-
 func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
 	table := mysql.GetTable(r.Table)
-	query, values := buildPUTQueryAndValues(r, table)
+	query, values := MysqlQueryBuilder{}.BuildPUTQueryAndValues(r, table)
 	stmt, err := mysql.db.Prepare(query)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
@@ -254,28 +165,9 @@ func (mysql *MysqlDatabase) Put(r request) (interface{}, error) {
 	return mysql.Get(r)
 }
 
-func buildPUTQueryAndValues(r request, t *Table) (string, []interface{}) {
-	query := "UPDATE " + t.Name + " SET "
-	values := make([]interface{}, 0)
-	i := 0
-	for key, value := range r.Data {
-		if t.HasColumn(key) {
-			if i > 0 {
-				query += ","
-			}
-			query += key + "=?"
-			values = append(values, value)
-			i++
-		}
-	}
-	query += " WHERE " + t.PKColumn + "=?"
-	values = append(values, r.Id)
-	return query, values
-}
-
 func (mysql *MysqlDatabase) Delete(r request) error {
 	table := mysql.GetTable(r.Table)
-	stmt, err := mysql.db.Prepare(buildDeleteQuery(table))
+	stmt, err := mysql.db.Prepare(MysqlQueryBuilder{}.BuildDeleteQuery(table))
 	if err != nil {
 		return ApiError{INTERNAL_SERVER_ERROR}
 	}
@@ -285,8 +177,4 @@ func (mysql *MysqlDatabase) Delete(r request) error {
 		return ApiError{INTERNAL_SERVER_ERROR}
 	}
 	return nil
-}
-
-func buildDeleteQuery(table *Table) string {
-	return "DELETE FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
 }

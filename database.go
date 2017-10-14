@@ -45,5 +45,5 @@ type DatabaseCredentials struct {
 	Password string
 	Host     string
 	Port     string
-	Type	 string
+	Type     string
 }
