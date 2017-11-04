@@ -12,10 +12,10 @@ type Handler struct {
 }
 
 func NewHandler(credentials DatabaseCredentials) *Handler {
-	handler := &Handler{tables: make(map[string]*Table)}
+	handler := &Handler{}
 	handler.getQueryBuilder(credentials)
-	handler.ConnectToDB(credentials)
-	handler.tables = handler.queryBuilder.ParseSchema(handler.db)
+	handler.connectToDB(credentials)
+	handler.getDBSchema()
 	return handler
 }
 
@@ -28,13 +28,17 @@ func (handler *Handler) getQueryBuilder(credentials DatabaseCredentials) {
 	}
 }
 
-func (handler *Handler) ConnectToDB(credentials DatabaseCredentials) {
+func (handler *Handler) connectToDB(credentials DatabaseCredentials) {
 	dsn := handler.queryBuilder.CreateDSN(credentials)
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
 	}
 	handler.db = db
+}
+
+func (handler *Handler) getDBSchema() {
+	handler.tables = handler.queryBuilder.ParseSchema(handler.db)
 }
 
 func (h *Handler) HandleRequest(r request) (interface{}, error) {

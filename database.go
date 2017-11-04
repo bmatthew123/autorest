@@ -21,18 +21,6 @@ type QueryBuilder interface {
 
 type DatabaseSchema map[string]*Table
 
-type SqlDatabase interface {
-	ConnectToDB(credentials DatabaseCredentials)
-	ParseSchema()
-	HasTable(tableName string) bool
-	GetTable(tableName string) *Table
-	Get(r request) (interface{}, error)
-	GetAll(r request) (interface{}, error)
-	Post(r request) (interface{}, error)
-	Put(r request) (interface{}, error)
-	Delete(r request) error
-}
-
 type Table struct {
 	Name     string
 	Columns  []*Column
