@@ -55,3 +55,7 @@ func (s *Server) ExcludeTables(tables ...string) {
 	}
 	s.handler.excludedTables = excludedTables
 }
+
+func (s *Server) ServeStaticFilesFromDirectory(directory string) {
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(directory))))
+}
