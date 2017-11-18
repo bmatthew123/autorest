@@ -1,8 +1,8 @@
 package autorest
 
 import (
-	"testing"
 	"github.com/DATA-DOG/go-sqlmock"
+	"testing"
 )
 
 var USERS_COLUMNS = []string{"id", "first_name", "last_name", "age", "email_address"}
@@ -25,7 +25,7 @@ func getHandlerForTesting(t *testing.T) (*Handler, sqlmock.Sqlmock) {
 func getTestingSchema() (schema DatabaseSchema) {
 	schema = make(map[string]*Table)
 	schema["users"] = &Table{
-		Name: "users",
+		Name:     "users",
 		PKColumn: "id",
 		Columns: []*Column{
 			&Column{Name: "id"},
@@ -36,7 +36,7 @@ func getTestingSchema() (schema DatabaseSchema) {
 		},
 	}
 	schema["products"] = &Table{
-		Name: "products",
+		Name:     "products",
 		PKColumn: "id",
 		Columns: []*Column{
 			&Column{Name: "id"},
@@ -94,8 +94,8 @@ func TestGetAll(t *testing.T) {
 	mock.ExpectPrepare("SELECT \\* FROM users").
 		ExpectQuery().
 		WillReturnRows(sqlmock.NewRows(USERS_COLUMNS).
-			AddRow(1, []byte("first"), []byte("last"), 30, []byte("guy@somewhere.com")).
-			AddRow(2, []byte("first1"), []byte("last1"), 15, nil))
+		AddRow(1, []byte("first"), []byte("last"), 30, []byte("guy@somewhere.com")).
+		AddRow(2, []byte("first1"), []byte("last1"), 15, nil))
 	rawResult, err := handler.HandleRequest(r)
 	if err != nil {
 		t.Errorf("An unexpected error occurred: %s", err)
@@ -182,6 +182,19 @@ func TestDelete(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	_, err := handler.HandleRequest(r)
 	if err != nil {
+		t.Errorf("An unexpected error occurred: %s", err)
+	}
+	checkExpectationsWereMet(t, mock)
+	cleanUp(handler)
+}
+
+func TestExcludeTable(t *testing.T) {
+	handler, mock := getHandlerForTesting(t)
+	handler.excludedTables = make(map[string]bool)
+	handler.excludedTables["users"] = true
+	r := request{Table: "users", Action: GET, Id: 1}
+	_, err := handler.HandleRequest(r)
+	if err.(ApiError).HTTPStatusCode != 404 {
 		t.Errorf("An unexpected error occurred: %s", err)
 	}
 	checkExpectationsWereMet(t, mock)

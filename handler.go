@@ -6,9 +6,10 @@ import (
 )
 
 type Handler struct {
-	db           *sql.DB
-	tables       DatabaseSchema
-	queryBuilder QueryBuilder
+	db             *sql.DB
+	tables         DatabaseSchema
+	queryBuilder   QueryBuilder
+	excludedTables map[string]bool
 }
 
 func NewHandler(credentials DatabaseCredentials) *Handler {
@@ -16,6 +17,7 @@ func NewHandler(credentials DatabaseCredentials) *Handler {
 	handler.getQueryBuilder(credentials)
 	handler.connectToDB(credentials)
 	handler.getDBSchema()
+	handler.excludedTables = make(map[string]bool)
 	return handler
 }
 
@@ -63,7 +65,8 @@ func (h *Handler) HandleRequest(r request) (interface{}, error) {
 
 func (handler *Handler) HasTable(tableName string) bool {
 	_, ok := handler.tables[tableName]
-	return ok
+	_, isExcluded := handler.excludedTables[tableName]
+	return ok && !isExcluded
 }
 
 func (handler *Handler) GetTable(tableName string) *Table {

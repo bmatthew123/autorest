@@ -47,3 +47,11 @@ func (s *Server) respond(result interface{}, w http.ResponseWriter) {
 	}
 	w.Write(response)
 }
+
+func (s *Server) ExcludeTables(tables ...string) {
+	excludedTables := make(map[string]bool)
+	for _, table := range tables {
+		excludedTables[table] = true
+	}
+	s.handler.excludedTables = excludedTables
+}
