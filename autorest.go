@@ -16,8 +16,17 @@ func NewServer(credentials DatabaseCredentials) *Server {
 	return s
 }
 
-func (s *Server) Run(port string) {
-	http.HandleFunc("/rest/", func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) Run(address string) {
+	http.HandleFunc("/rest/", s.handleAutorestRequest)
+	panic(http.ListenAndServe(address, nil))
+}
+
+func (s *Server) RunTLS(address, certFile, keyFile string) {
+	http.HandleFunc("/rest/", s.handleAutorestRequest)
+	panic(http.ListenAndServeTLS(address, certFile, keyFile, nil))
+}
+
+func (s *Server) handleAutorestRequest(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		request, err := parseRequest(r)
 		if err != nil {
@@ -34,8 +43,6 @@ func (s *Server) Run(port string) {
 			return
 		}
 		s.respond(result, w)
-	})
-	panic(http.ListenAndServe(":"+port, nil))
 }
 
 func (s *Server) respond(result interface{}, w http.ResponseWriter) {
