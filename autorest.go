@@ -27,22 +27,22 @@ func (s *Server) RunTLS(address, certFile, keyFile string) {
 }
 
 func (s *Server) handleAutorestRequest(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		request, err := parseRequest(r)
-		if err != nil {
-			statusCode, _ := strconv.Atoi(err.Error())
-			w.WriteHeader(statusCode)
-			w.Write([]byte("{\"message\":\"Server returned status code " + err.Error() + "\"}"))
-			return
-		}
-		result, err := s.handler.HandleRequest(request)
-		if err != nil {
-			statusCode, _ := strconv.Atoi(err.Error())
-			w.WriteHeader(statusCode)
-			w.Write([]byte("{\"message\":\"Server returned status code " + err.Error() + "\"}"))
-			return
-		}
-		s.respond(result, w)
+	w.Header().Set("Content-Type", "application/json")
+	request, err := parseRequest(r)
+	if err != nil {
+		statusCode, _ := strconv.Atoi(err.Error())
+		w.WriteHeader(statusCode)
+		w.Write([]byte("{\"message\":\"Server returned status code " + err.Error() + "\"}"))
+		return
+	}
+	result, err := s.handler.HandleRequest(request)
+	if err != nil {
+		statusCode, _ := strconv.Atoi(err.Error())
+		w.WriteHeader(statusCode)
+		w.Write([]byte("{\"message\":\"Server returned status code " + err.Error() + "\"}"))
+		return
+	}
+	s.respond(result, w)
 }
 
 func (s *Server) respond(result interface{}, w http.ResponseWriter) {
