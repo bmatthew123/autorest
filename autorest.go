@@ -66,3 +66,7 @@ func (s *Server) ExcludeTables(tables ...string) {
 func (s *Server) ServeStaticFilesFromDirectory(directory string) {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(directory))))
 }
+
+func (s *Server) RegisterHandler(pattern string, handler func(http.ResponseWriter, *http.Request)) {
+	http.HandleFunc(pattern, handler)
+}
