@@ -2,27 +2,40 @@ package autorest
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 )
 
 type Server struct {
 	handler *Handler
+	logger *logger
 }
 
 func NewServer(credentials DatabaseCredentials) *Server {
 	s := &Server{}
 	s.handler = NewHandler(credentials)
+	s.logger = &logger{level: NONE}
 	return s
+}
+
+func (s *Server) TurnOnLogging(level uint8, out io.Writer, flags int) {
+	s.logger = newLogger(level, out, flags)
+}
+
+func (s *Server) TurnOffLogging() {
+	s.logger.level = NONE
 }
 
 func (s *Server) Run(address string) {
 	http.HandleFunc("/rest/", s.handleAutorestRequest)
+	s.logger.Info("Starting server on " + address)
 	panic(http.ListenAndServe(address, nil))
 }
 
 func (s *Server) RunTLS(address, certFile, keyFile string) {
 	http.HandleFunc("/rest/", s.handleAutorestRequest)
+	s.logger.Info("Starting server with TLS on " + address)
 	panic(http.ListenAndServeTLS(address, certFile, keyFile, nil))
 }
 

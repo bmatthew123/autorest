@@ -2,7 +2,6 @@ package autorest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -94,7 +93,6 @@ func parseDataFromRequest(r *http.Request) (map[string]interface{}, error) {
 	var data map[string]interface{}
 	err := decoder.Decode(&data)
 	if err != nil {
-		fmt.Println(err)
 		return nil, ApiError{BAD_REQUEST}
 	}
 	return data, nil
