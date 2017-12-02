@@ -69,8 +69,30 @@ func (MysqlQueryBuilder) BuildSelectQuery(table *Table) string {
 	return "SELECT * FROM " + table.Name + " WHERE " + table.PKColumn + "=?"
 }
 
-func (MysqlQueryBuilder) BuildSelectAllQuery(table *Table) string {
-	return "SELECT * FROM " + table.Name
+func (MysqlQueryBuilder) BuildSelectAllQuery(r request, table *Table) (query string, values []interface{}) {
+	query = "SELECT * FROM " + table.Name + " WHERE "
+	values = make([]interface{}, 0)
+	i := 0
+	for column, value := range r.QueryParameters {
+		if table.HasColumn(column) {
+			if i > 0 {
+				query += " AND "
+			}
+			switch value.(type) {
+			case int8, int16, int32, int64, uint8, uint16, uint32, uint64:
+				values = append(values, value)
+				query += column + " = ? "
+			case string:
+				values = append(values, "%" + value.(string) + "%")
+				query += column + " LIKE ? "
+			case []byte:
+				values = append(values, "%" + string(value.([]byte)) + "%")
+				query += column + " LIKE ? "
+			}
+			i++
+		}
+	}
+	return
 }
 
 func (MysqlQueryBuilder) BuildPOSTQueryAndValues(r request, t *Table) (query string, values []interface{}) {

@@ -118,11 +118,12 @@ func (handler *Handler) Get(r request) (interface{}, error) {
 
 func (handler *Handler) GetAll(r request) (interface{}, error) {
 	table := handler.GetTable(r.Table)
-	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildSelectAllQuery(table))
+	queryString, parameters := handler.queryBuilder.BuildSelectAllQuery(r, table)
+	stmt, err := handler.db.Prepare(queryString)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
-	rows, err := stmt.Query()
+	rows, err := stmt.Query(parameters...)
 	if err != nil {
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}

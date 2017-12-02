@@ -13,7 +13,7 @@ type QueryBuilder interface {
 	CreateDSN(credentials DatabaseCredentials) string
 	ParseSchema(db *sql.DB) DatabaseSchema
 	BuildSelectQuery(table *Table) string
-	BuildSelectAllQuery(table *Table) string
+	BuildSelectAllQuery(r request, table *Table) (string, []interface{})
 	BuildPOSTQueryAndValues(r request, t *Table) (string, []interface{})
 	BuildPUTQueryAndValues(r request, t *Table) (string, []interface{})
 	BuildDeleteQuery(table *Table) string

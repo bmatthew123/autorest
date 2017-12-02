@@ -20,6 +20,7 @@ type request struct {
 	Action int
 	Id     int64
 	Data   map[string]interface{}
+	QueryParameters map[string]interface{}
 	hasId  bool
 }
 
@@ -43,7 +44,18 @@ func parseRequest(r *http.Request) (request, error) {
 			return request{}, err
 		}
 	}
-	return request{Id: id, Table: parts[1], Action: method, Data: data, hasId: hasId}, nil
+	queryParameters, err := parseQueryParameters(r)
+	if err != nil {
+		return request{}, err
+	}
+	return request{
+		Id: id,
+		Table: parts[1],
+		Action: method,
+		Data: data,
+		QueryParameters: queryParameters,
+		hasId: hasId,
+	}, nil
 }
 
 func getMethod(r *http.Request) (int, error) {
@@ -96,4 +108,12 @@ func parseDataFromRequest(r *http.Request) (map[string]interface{}, error) {
 		return nil, ApiError{BAD_REQUEST}
 	}
 	return data, nil
+}
+
+func parseQueryParameters(r *http.Request) (map[string]interface{}, error) {
+	queryParameters := make(map[string]interface{})
+	for key, value := range r.URL.Query() {
+		queryParameters[key] = value[0]
+	}
+	return queryParameters, nil
 }
