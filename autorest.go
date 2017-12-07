@@ -16,11 +16,13 @@ func NewServer(credentials DatabaseCredentials) *Server {
 	s := &Server{}
 	s.handler = NewHandler(credentials)
 	s.logger = &logger{level: NONE}
+	s.handler.logger = s.logger
 	return s
 }
 
 func (s *Server) TurnOnLogging(level uint8, out io.Writer, flags int) {
 	s.logger = newLogger(level, out, flags)
+	s.handler.logger = s.logger
 }
 
 func (s *Server) TurnOffLogging() {

@@ -70,13 +70,15 @@ func (MysqlQueryBuilder) BuildSelectQuery(table *Table) string {
 }
 
 func (MysqlQueryBuilder) BuildSelectAllQuery(r request, table *Table) (query string, values []interface{}) {
-	query = "SELECT * FROM " + table.Name + " WHERE "
+	query = "SELECT * FROM " + table.Name
 	values = make([]interface{}, 0)
 	i := 0
 	for column, value := range r.QueryParameters {
 		if table.HasColumn(column) {
 			if i > 0 {
 				query += " AND "
+			} else {
+				query += " WHERE "
 			}
 			switch value.(type) {
 			case int8, int16, int32, int64, uint8, uint16, uint32, uint64:

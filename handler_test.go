@@ -14,6 +14,7 @@ func getHandlerForTesting(t *testing.T) (*Handler, sqlmock.Sqlmock) {
 	h := &Handler{}
 	h.getQueryBuilder(cred)
 	h.tables = getTestingSchema()
+	h.logger = newLogger(NONE, nil, 0)
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("an error ocurred with sqlmock %s", err)

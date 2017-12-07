@@ -10,6 +10,7 @@ type Handler struct {
 	tables         DatabaseSchema
 	queryBuilder   QueryBuilder
 	excludedTables map[string]bool
+	logger         *logger
 }
 
 func NewHandler(credentials DatabaseCredentials) *Handler {
@@ -45,6 +46,7 @@ func (handler *Handler) getDBSchema() {
 
 func (h *Handler) HandleRequest(r request) (interface{}, error) {
 	if !h.HasTable(r.Table) {
+		h.logger.Info("Request was made for non-existing table " + r.Table)
 		return nil, ApiError{NOT_FOUND}
 	}
 	switch r.Action {
@@ -81,14 +83,17 @@ func (handler *Handler) Get(r request) (interface{}, error) {
 	table := handler.GetTable(r.Table)
 	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildSelectQuery(table))
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	rows, err := stmt.Query(r.Id)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	columns, err := rows.Columns()
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
@@ -101,11 +106,13 @@ func (handler *Handler) Get(r request) (interface{}, error) {
 			rowPointers[i] = &row[i]
 		}
 		if err = rows.Scan(rowPointers...); err != nil {
+			handler.logger.Error(err.Error())
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
 		for i, column := range columns {
 			value, err := DetermineTypeForRawValue(rowPointers[i])
 			if err != nil {
+				handler.logger.Error(err.Error())
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
 			result[column] = value
@@ -121,14 +128,17 @@ func (handler *Handler) GetAll(r request) (interface{}, error) {
 	queryString, parameters := handler.queryBuilder.BuildSelectAllQuery(r, table)
 	stmt, err := handler.db.Prepare(queryString)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	rows, err := stmt.Query(parameters...)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	columns, err := rows.Columns()
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
@@ -142,11 +152,13 @@ func (handler *Handler) GetAll(r request) (interface{}, error) {
 			rowPointers[i] = &row[i]
 		}
 		if err = rows.Scan(rowPointers...); err != nil {
+			handler.logger.Error(err.Error())
 			return nil, ApiError{INTERNAL_SERVER_ERROR}
 		}
 		for i, column := range columns {
 			value, err := DetermineTypeForRawValue(rowPointers[i])
 			if err != nil {
+				handler.logger.Error(err.Error())
 				return nil, ApiError{INTERNAL_SERVER_ERROR}
 			}
 			item[column] = value
@@ -161,10 +173,12 @@ func (handler *Handler) Post(r request) (interface{}, error) {
 	query, values := handler.queryBuilder.BuildPOSTQueryAndValues(r, table)
 	stmt, err := handler.db.Prepare(query)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	result, err := stmt.Exec(values...)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
@@ -191,11 +205,13 @@ func (handler *Handler) Put(r request) (interface{}, error) {
 	query, values := handler.queryBuilder.BuildPUTQueryAndValues(r, table)
 	stmt, err := handler.db.Prepare(query)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(values...)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return nil, ApiError{INTERNAL_SERVER_ERROR}
 	}
 	return handler.Get(r)
@@ -205,11 +221,13 @@ func (handler *Handler) Delete(r request) error {
 	table := handler.GetTable(r.Table)
 	stmt, err := handler.db.Prepare(handler.queryBuilder.BuildDeleteQuery(table))
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return ApiError{INTERNAL_SERVER_ERROR}
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(r.Id)
 	if err != nil {
+		handler.logger.Error(err.Error())
 		return ApiError{INTERNAL_SERVER_ERROR}
 	}
 	return nil
