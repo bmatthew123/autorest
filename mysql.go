@@ -3,6 +3,7 @@ package autorest
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -74,7 +75,7 @@ func (MysqlQueryBuilder) BuildSelectAllQuery(r request, table *Table) (query str
 	values = make([]interface{}, 0)
 	i := 0
 	for column, value := range r.QueryParameters {
-		if table.HasColumn(column) {
+		if table.HasColumn(column) && column != "sort" {
 			if i > 0 {
 				query += " AND "
 			} else {
@@ -94,7 +95,45 @@ func (MysqlQueryBuilder) BuildSelectAllQuery(r request, table *Table) (query str
 			i++
 		}
 	}
+	query += buildSortClause(r, table)
 	return
+}
+
+func buildSortClause(r request, table *Table) string {
+	columnString, ok := r.QueryParameters["sort"]
+	if !ok {
+		return ""
+	}
+	var columns []string
+	if strings.Contains(columnString.(string), ",") {
+		columns = strings.Split(columnString.(string), ",")
+	} else {
+		columns = make([]string, 1)
+		columns[0] = columnString.(string)
+	}
+	sortClause := ""
+	if len(columns) > 0 {
+		sortClause += " ORDER BY "
+	}
+	for i, column := range columns {
+		if i > 0 {
+			sortClause += ", "
+		}
+		colName := column
+		sortDescending := column[0] == '-'
+		if sortDescending {
+			colName = column[1:]
+		}
+		if table.HasColumn(colName) {
+			sortClause += colName
+			if sortDescending {
+				sortClause += " DESC"
+			} else {
+				sortClause += " ASC"
+			}
+		}
+	}
+	return sortClause
 }
 
 func (MysqlQueryBuilder) BuildPOSTQueryAndValues(r request, t *Table) (query string, values []interface{}) {
